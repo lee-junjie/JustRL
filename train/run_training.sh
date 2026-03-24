@@ -1,54 +1,37 @@
 #!/bin/bash
+set -euo pipefail
 set -x
 
-# CRITICAL: Activate conda environment to ensure all paths are correct
-source ~/miniconda3/etc/profile.d/conda.sh
-conda activate hbx_ck
-
 export PYTHONUNBUFFERED=1
-export PROJECT_NAME='justrl'
-export PROJECT_PATH=/home/test/test06/hbx/JustRL/train
-export DATA_DIR=$PROJECT_PATH/data
-
-export EXPERIMENT_NAME=JustRL-DeepSeek-1.5B-$(date +%Y-%m-%d_%H-%M-%S)
-
-export TRAIN_DATASET=$DATA_DIR/DAPO/dapo-math-17k.parquet
-# export TRAIN_DATASET=$DATA_DIR/DAPO/dapo-math-17k-sample-10k.parquet
-export TEST_AIME24=$DATA_DIR/AIME24/test.parquet
-export TEST_AIME25=$DATA_DIR/AIME25/test.parquet
-export TEST_AMC23=$DATA_DIR/AMC23/test.parquet
-
-# export TEST_DATASET="['$TEST_AIME24']"
-export TEST_DATASET="['$TEST_AIME24', '$TEST_AIME25', '$TEST_AMC23']"
-
-# Model and training paths
-# export ACTOR_MODEL_PATH=/home/test/testdata/models/OpenMath-Nemotron-1.5B
-export ACTOR_MODEL_PATH=/home/test/testdata/models/DeepSeek-R1-Distill-Qwen-1.5B
-
-
+export PROJECT_NAME=justrl
+export PROJECT_PATH=/mnt/3fs/data/junjie.li/rl-parity-test/JustRL/train
+export SHARED_DATA_ROOT=/mnt/3fs/data/junjie.li/test-data-dir/BytedTsinghua-SIA
+export TRAIN_DATASET=$SHARED_DATA_ROOT/DAPO-Math-17k/data/dapo-math-17k.parquet
+export TEST_AIME24=$SHARED_DATA_ROOT/AIME-2024/data/aime-2024.parquet
+export TEST_DATASET="['$TEST_AIME24']"
+export ACTOR_MODEL_PATH=/mnt/3fs/data/junjie.li/test-model-dir/deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B
+export EXPERIMENT_NAME=${EXPERIMENT_NAME:-justrl_$(date +%Y%m%d_%H%M%S)_$$}
 export PARALLEL_SIZE=1
-export CKPT_PATH=${PROJECT_PATH}/checkpoints
-export OUTLINES_CACHE_DIR=~/.cache/outlines/$(uuidgen)
+export CKPT_PATH=/mnt/3fs/data/junjie.li/rl-parity-test/JustRL/train/checkpoints
+export TMP_DIR=/mnt/3fs/data/junjie.li/rl-parity-test/JustRL/train/tmp
+export OUTLINES_CACHE_DIR="${OUTLINES_CACHE_DIR:-$TMP_DIR/outlines-$EXPERIMENT_NAME}"
+mkdir -p "$TMP_DIR" "$CKPT_PATH" "$OUTLINES_CACHE_DIR"
 
-# Environment settings
+RUN_LOG="${TMP_DIR}/run_training_${EXPERIMENT_NAME}.log"
+exec > >(tee -a "$RUN_LOG") 2>&1
+
 export NCCL_DEBUG=WARN
-export WANDB_API_KEY='7e69f789501e2f5153bf315454c1f1a414b06c55'
 export TOKENIZERS_PARALLELISM=true
-export WANDB_MODE=offline
-export WANDB_DIR=${PROJECT_PATH}/wandb/
-export TENSORBOARD_DIR=${PROJECT_PATH}/tensorboard/$PROJECT_NAME/$EXPERIMENT_NAME
+export TENSORBOARD_DIR=$TMP_DIR/logs/JustRL/$EXPERIMENT_NAME
 export HYDRA_FULL_ERROR=1
 export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 
-# IMPORTANT: Set Ray address to connect to existing cluster
-export RAY_ADDRESS="11.11.18.2:6379"
+mkdir -p "$TENSORBOARD_DIR"
 
-cd $PROJECT_PATH
 
-# Set PYTHONPATH to include JustRL directory so verl module can be imported without installation
-export PYTHONPATH="${PROJECT_PATH}:${PYTHONPATH}"
+cd "$PROJECT_PATH"
 
-python3 -m verl.trainer.main_ppo \
+python -m verl.trainer.main_ppo \
     algorithm.adv_estimator=grpo \
     algorithm.use_kl_in_reward=False \
     algorithm.kl_ctrl.kl_coef=0.0 \
@@ -103,7 +86,7 @@ python3 -m verl.trainer.main_ppo \
     trainer.project_name=$PROJECT_NAME \
     trainer.experiment_name=$EXPERIMENT_NAME \
     trainer.n_gpus_per_node=8 \
-    trainer.nnodes=4 \
+    trainer.nnodes=1 \
     trainer.save_freq=50 \
     trainer.test_freq=50 \
     trainer.total_epochs=1 \
