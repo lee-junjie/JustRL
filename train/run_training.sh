@@ -16,7 +16,7 @@ export CKPT_PATH=/mnt/3fs/data/junjie.li/rl-parity-test/JustRL/train/checkpoints
 export TMP_DIR=/mnt/3fs/data/junjie.li/rl-parity-test/JustRL/train/tmp
 export OUTLINES_CACHE_DIR="${OUTLINES_CACHE_DIR:-$TMP_DIR/outlines-$EXPERIMENT_NAME}"
 mkdir -p "$TMP_DIR" "$CKPT_PATH" "$OUTLINES_CACHE_DIR"
-
+NUM_NODES="${NUM_NODES:-1}"
 RUN_LOG="${TMP_DIR}/run_training_${EXPERIMENT_NAME}.log"
 exec > >(tee -a "$RUN_LOG") 2>&1
 
@@ -86,7 +86,7 @@ python -m verl.trainer.main_ppo \
     trainer.project_name=$PROJECT_NAME \
     trainer.experiment_name=$EXPERIMENT_NAME \
     trainer.n_gpus_per_node=8 \
-    trainer.nnodes=1 \
+    trainer.nnodes=$NUM_NODES \
     trainer.save_freq=50 \
     trainer.test_freq=50 \
     trainer.total_epochs=1 \
